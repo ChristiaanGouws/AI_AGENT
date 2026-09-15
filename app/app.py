@@ -4,13 +4,15 @@ import time
 
 st.set_page_config(page_title="SA Property Investment Briefing", page_icon="🏢")
 st.title("🏢 SA Property Investment Briefing Agent")
-st.write("Click the button below to trigger the CrewAI agent and view the generated output.")
+st.write("Enter your email below to receive the property briefing directly in your inbox.")
 
+# User Inputs
 api_token = st.text_input("Enter CrewAI API Token:", type="password")
+recipient_email = st.text_input("Enter Your Email Address:", placeholder="lecturer@university.ac.za")
 
-if st.button("Run Property Briefing"):
-    if not api_token:
-        st.warning("Please enter your API token.")
+if st.button("Send Briefing to Email"):
+    if not api_token or not recipient_email:
+        st.warning("Please provide both the API token and your email address.")
     else:
         base_url = "https://sa-property-investment-briefing-v1-15fc6050-50e951b3.crewai.com"
         headers = {
@@ -18,19 +20,24 @@ if st.button("Run Property Briefing"):
             "Content-Type": "application/json"
         }
         
+        # Pass the dynamic email to CrewAI inputs
+        payload = {
+            "inputs": {
+                "recipient_email": recipient_email.strip()
+            }
+        }
+        
         try:
-            # 1. Trigger Kickoff
-            with st.spinner("Starting agent execution..."):
-                kickoff_res = requests.post(f"{base_url}/kickoff", headers=headers, json={"inputs": {}})
+            with st.spinner("Starting execution..."):
+                kickoff_res = requests.post(f"{base_url}/kickoff", headers=headers, json=payload)
             
             if kickoff_res.status_code == 200:
                 kickoff_id = kickoff_res.json().get("kickoff_id")
-                st.info(f"Agent started! (ID: {kickoff_id}) Fetching result...")
+                st.info(f"Agent started! Sending status requests...")
                 
-                # 2. Poll Status Endpoint
                 status_url = f"{base_url}/status/{kickoff_id}"
                 
-                with st.spinner("Agent is researching & generating report..."):
+                with st.spinner("Researching and sending email..."):
                     while True:
                         time.sleep(3)
                         status_res = requests.get(status_url, headers=headers)
@@ -40,13 +47,11 @@ if st.button("Run Property Briefing"):
                             state = str(data.get("status", "")).upper()
                             
                             if state in ["SUCCESS", "COMPLETED", "FINISHED"]:
-                                st.success("Briefing Complete!")
-                                # Display result output
-                                result_text = data.get("result", data.get("output", data))
-                                st.markdown(result_text)
+                                st.success(f"Briefing successfully sent to **{recipient_email}**!")
+                                st.markdown(data.get("result", data.get("output", "")))
                                 break
                             elif state in ["FAILED", "ERROR"]:
-                                st.error("Execution failed on server.")
+                                st.error("Execution failed.")
                                 st.json(data)
                                 break
                         else:
